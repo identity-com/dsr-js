@@ -52,8 +52,8 @@ const validConfig = {
 const { ScopeRequest, buildSignedRequestBody, verifySignedRequestBody } = require('../../src/ScopeRequest');
 
 // -----Fixtures
-const idDoc = require('../fixtures/idDocCred');
-const emailV3Doc = require('../fixtures/emailV3Cred');
+const idDoc = require('../fixtures/idDocCred.json');
+const emailV3Doc = require('../fixtures/emailV3Cred.json');
 const filteredIdDoc = require('../fixtures/idDocV2Filtered.json');
 
 describe('DSR Factory Tests', () => {
@@ -364,7 +364,21 @@ describe('DSR Factory Tests', () => {
     const authentication = false;
     const dsr = await ScopeRequest.create(
       'abcd',
-      ['credential-cvc:Identity-v1'],
+      [
+        {
+          identifier: 'credential-cvc:LiveIdDocument-v1',
+          constraints: {
+            meta: {
+              credential: 'credential-cvc:LiveIdDocument-v1',
+              issuer: {
+                is: {
+                  $eq: 'did:ethr:0x1a88a35421a4a0d3e13fe4e8ebcf18e9a249dc5a',
+                },
+              },
+            },
+          },
+        },
+      ],
       validConfig.channels,
       validConfig.app,
       validConfig.partner,
@@ -632,200 +646,425 @@ describe('DSR Request Utils', () => {
     expect(dsr).toBeDefined();
   });
 
-  it('Should check if credentials matches the request constraints', async () => {
-    const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:IdDocument-v1',
-        credential: 'credential-cvc:IdDocument-v1',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+  describe('credentialsMatchesRequest', () => {
+    describe('with credentials that pass constraints', () => {
+      it('Should check if credentials matches the request constraints', async () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            credential: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
+        expect(match).toBeTruthy();
+      });
+
+      it('Should check if a v3 credential matches the request constraints', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
+        expect(match).toBeTruthy();
+      });
+
+      it('Should check if a v3 credential matches the request constraints including the credential meta', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
+        expect(match).toBeTruthy();
+      });
+
+      it('Should check if partial credentials matches the request constraints', async () => {
+        const credentialItems = [filteredIdDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'claim-cvc:Document.dateOfBirth-v1',
+            credential: 'credential-cvc:IdDocument-v2',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0x1a88a35421a4a0d3e13fe4e8ebcf18e9a249dc5a' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
+        expect(match).toBeTruthy();
+      });
+    });
+
+    describe('with credentials that fail constraints', () => {
+      it('Should fail check if credentials dont match the request constraints', async () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            credential: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-49y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
+        expect(match).toBeFalsy();
+      });
+
+      it('Should fail check if v3 credential doesnt match the request constraints', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'gmail' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        // will fail check because the credential domain is civic (not gmail)
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
+        expect(match).toBeFalsy();
+      });
+
+      it('Should fail ckeck if a credential fails the credential meta check', async () => {
+        const credentialItems = [idDoc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            credential: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:different-issuer' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
+        expect(match).toBeFalsy();
+      });
+
+      it('Should fail check if v3 credential fails the credential meta check', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:different-issuer' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        // will fail check because the credential domain is civic (not gmail)
+        const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
+        expect(match).toBeFalsy();
+      });
+
+      it('Should throw with empty credentialItems', async () => {
+        const credentialItems = []; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        return expect(ScopeRequest.credentialsMatchesRequest(credentialItems, dsr)).rejects.toThrow('empty credentialItems param');
+      });
+
+      it('Should throw with invaid scopeRequest', () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = [{
+          identifier: 'credential-cvc:IdDocument-v1',
+          constraints: {
+            meta: {
+              issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+            },
+            claims: [
+              { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
+            ],
           },
-          claims: [
-            { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
-    expect(match).toBeTruthy();
+        }];
+        expect(dsr).toBeDefined();
+        return expect(ScopeRequest.credentialsMatchesRequest(credentialItems, dsr)).rejects.toThrow('invalid scopeRequest object');
+      });
+    });
   });
 
-  it('Should check if a v3 credential matches the request constraints', async () => {
-    const credentialItems = [emailV3Doc];
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:Email-v3',
-        credential: 'credential-cvc:Email-v3',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
-          },
-          claims: [
-            { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
-    expect(match).toBeTruthy();
-  });
+  describe('getFailingConstraints', () => {
+    describe('with credentials that pass constraints', () => {
+      it('should return an empty array for an age check', async () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            credential: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-1y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([]);
+      });
 
-  it('Should check if a v3 credential matches the request constraints including the credential meta', async () => {
-    const credentialItems = [emailV3Doc];
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:Email-v3',
-        credential: 'credential-cvc:Email-v3',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
-          },
-          claims: [
-            { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
-    expect(match).toBeTruthy();
-  });
+      it('Should check if a v3 credential matches the request constraints and return an empty array', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([]);
+      });
 
-  it('Should check if partial credentials matches the request constraints', async () => {
-    const credentialItems = [filteredIdDoc]; // This is should be the CI on the scopeRequest response
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'claim-cvc:Document.dateOfBirth-v1',
-        credential: 'credential-cvc:IdDocument-v2',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:ethr:0x1a88a35421a4a0d3e13fe4e8ebcf18e9a249dc5a' } },
-          },
-          claims: [
-            { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
-    expect(match).toBeTruthy();
-  });
+      it('Should check if a v3 credential matches the request constraints including the credential meta and return an empty array', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([]);
+      });
 
-  it('Should fail ckeck if credentials dont match the request constraints', async () => {
-    const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:IdDocument-v1',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
-          },
-          claims: [
-            { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
-    expect(match).toBeFalsy();
-  });
+      it('Should check if partial credentials matches the request constraints and return an empty array', async () => {
+        const credentialItems = [filteredIdDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'claim-cvc:Document.dateOfBirth-v1',
+            credential: 'credential-cvc:IdDocument-v2',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0x1a88a35421a4a0d3e13fe4e8ebcf18e9a249dc5a' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([]);
+      });
+    });
 
-  it('Should fail check if v3 credential doesnt match the request constraints', async () => {
-    const credentialItems = [emailV3Doc];
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:Email-v3',
-        credential: 'credential-cvc:Email-v3',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
-          },
-          claims: [
-            { path: 'contact.email.domain.name', is: { $eq: 'gmail' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    // will fail check because the credential domain is civic (not gmail)
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr);
-    expect(match).toBeFalsy();
-  });
+    describe('with credentials that fail constraints', () => {
+      it('Should return the failed constraints if credentials dont match the request constraints', async () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-49y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([{
+          credentialId: idDoc.id,
+          identifier: 'credential-cvc:IdDocument-v1',
+          constraint: { path: 'document.dateOfBirth', is: { $lte: '-49y' } },
+        }]);
+      });
 
-  it('Should fail ckeck if a credential fails the credential meta check', async () => {
-    const credentialItems = [idDoc];
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:IdDocument-v1',
-        credential: 'credential-cvc:IdDocument-v1',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:ethr:different-issuer' } },
-          },
-          claims: [
-            { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
-    expect(match).toBeFalsy();
-  });
+      it('Should fail check if v3 credential doesnt match the request constraints', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:tid652xmv91UHLW3HKnQSYMoNYko6FWd8sUEuYF5LPn' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'gmail' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        // will fail check because the credential domain is civic (not gmail)
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr);
+        expect(failingConstraints).toEqual([{
+          credentialId: emailV3Doc.id,
+          identifier: 'credential-cvc:Email-v3',
+          constraint: { path: 'contact.email.domain.name', is: { $eq: 'gmail' } },
+        }]);
+      });
 
-  it('Should fail check if v3 credential fails the credential meta check', async () => {
-    const credentialItems = [emailV3Doc];
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:Email-v3',
-        credential: 'credential-cvc:Email-v3',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:sol:different-issuer' } },
-          },
-          claims: [
-            { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    // will fail check because the credential domain is civic (not gmail)
-    const match = await ScopeRequest.credentialsMatchesRequest(credentialItems, dsr, true);
-    expect(match).toBeFalsy();
-  });
+      it('Should fail ckeck if a credential fails the credential meta check', async () => {
+        const credentialItems = [idDoc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            credential: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:different-issuer' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-21y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr, true);
+        expect(failingConstraints).toEqual([{
+          credentialId: idDoc.id,
+          identifier: 'credential-cvc:IdDocument-v1',
+          constraint: { path: 'meta.issuer', is: { $eq: 'did:ethr:different-issuer' } },
+        }]);
+      });
 
-  it('Should throw with empty credentialItems', async () => {
-    const credentialItems = []; // This is should be the CI on the scopeRequest response
-    const dsr = await ScopeRequest.create('abcd',
-      [{
-        identifier: 'credential-cvc:IdDocument-v1',
-        constraints: {
-          meta: {
-            issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
-          },
-          claims: [
-            { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
-          ],
-        },
-      }]);
-    expect(dsr).toBeDefined();
-    return expect(ScopeRequest.credentialsMatchesRequest(credentialItems, dsr)).rejects.toThrow('empty credentialItems param');
-  });
+      it('Should fail check if v3 credential fails the credential meta check', async () => {
+        const credentialItems = [emailV3Doc];
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:Email-v3',
+            credential: 'credential-cvc:Email-v3',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:sol:different-issuer' } },
+              },
+              claims: [
+                { path: 'contact.email.domain.name', is: { $eq: 'civic' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        // will fail check because the credential domain is civic (not gmail)
+        const failingConstraints = await ScopeRequest.getFailingConstraints(credentialItems, dsr, true);
+        expect(failingConstraints).toEqual([{
+          credentialId: emailV3Doc.id,
+          identifier: 'credential-cvc:Email-v3',
+          constraint: { path: 'meta.issuer', is: { $eq: 'did:sol:different-issuer' } },
+        }]);
+      });
 
-  it('Should throw with invaid scopeRequest', () => {
-    const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
-    const dsr = [{
-      identifier: 'credential-cvc:IdDocument-v1',
-      constraints: {
-        meta: {
-          issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
-        },
-        claims: [
-          { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
-        ],
-      },
-    }];
-    expect(dsr).toBeDefined();
-    return expect(ScopeRequest.credentialsMatchesRequest(credentialItems, dsr)).rejects.toThrow('invalid scopeRequest object');
+      it('Should throw with empty credentialItems', async () => {
+        const credentialItems = []; // This is should be the CI on the scopeRequest response
+        const dsr = await ScopeRequest.create('abcd',
+          [{
+            identifier: 'credential-cvc:IdDocument-v1',
+            constraints: {
+              meta: {
+                issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+              },
+              claims: [
+                { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
+              ],
+            },
+          }]);
+        expect(dsr).toBeDefined();
+        return expect(ScopeRequest.getFailingConstraints(credentialItems, dsr)).rejects.toThrow('empty credentialItems param');
+      });
+
+      it('Should throw with invaid scopeRequest', () => {
+        const credentialItems = [idDoc]; // This is should be the CI on the scopeRequest response
+        const dsr = [{
+          identifier: 'credential-cvc:IdDocument-v1',
+          constraints: {
+            meta: {
+              issuer: { is: { $eq: 'did:ethr:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74' } },
+            },
+            claims: [
+              { path: 'document.dateOfBirth', is: { $lte: '-45y' } },
+            ],
+          },
+        }];
+        expect(dsr).toBeDefined();
+        return expect(ScopeRequest.getFailingConstraints(credentialItems, dsr)).rejects.toThrow('invalid scopeRequest object');
+      });
+    });
   });
 
   it('Should Construct DSR with evidence idDocumentFront requested with auth', async () => {

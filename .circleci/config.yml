@@ -3,7 +3,7 @@ version: 2
 defaults: &defaults
   working_directory: ~/repo
   docker:
-    - image: circleci/node:14.17.0
+    - image: cimg/node:20.11.1
 
 workflows:
   version: 2
@@ -90,18 +90,16 @@ jobs:
       - restore_cache:
           keys:
           - v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
-      - run: sudo apt-get update
-      - run: sudo npm install -g npm
-      - run: npm ci
+      - run: yarn install
       - save_cache:
           paths:
             - node_modules
           key: v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
       - run:
           name: run tests incl coverage
-          command: npm run test
-      - run: npm run lint
-      - run: npm run build
+          command: yarn test
+      - run: yarn lint
+      - run: yarn build
 
       - persist_to_workspace:
           root: ~/repo
@@ -118,20 +116,19 @@ jobs:
           keys:
           - v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
       - run: sudo apt-get update && sudo apt-get install default-jre
-      - run: sudo npm install -g npm
       - run: |
           sh ./.circleci/install_hub.sh
           mkdir -p ~/.config/ && echo -e "github.com:\n- user: civictechuser\n  oauth_token: $GITHUB_API_KEY\n  protocol: https\n" > ~/.config/hub
-      - run: npm ci
+      - run: yarn install
       - save_cache:
           paths:
             - node_modules
           key: v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
       - run:
           name: run tests incl coverage
-          command: npm run test
-      - run: npm run lint
-      - run: npm run build
+          command: yarn test
+      - run: yarn lint
+      - run: yarn build
       - run:
           name: git config
           command: |
@@ -141,7 +138,7 @@ jobs:
             git config --global push.default simple
       - run:
           name: create-release
-          command: npm run release:create
+          command: yarn release:create
       - run:
           name: delete-release-tag
           command: git push --delete origin $CIRCLE_TAG
@@ -158,7 +155,7 @@ jobs:
           command: echo "//registry.npmjs.org/:_authToken=$IDENTITY_NPM_TOKEN" > ~/repo/.npmrc
       - run:
           name: Publish package
-          command: npm publish --access=public
+          command: yarn publish --access=public
 
   publish-schemas:
     docker:
@@ -176,13 +173,12 @@ jobs:
       - restore_cache:
           keys:
           - v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
-      - run: sudo npm install -g npm
-      - run: npm install
+      - run: yarn install
       - save_cache:
           paths:
             - node_modules
           key: v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
-      - run: npm run publish-schemas
+      - run: yarn publish-schemas
 
   check-schemas:
     docker:
@@ -198,10 +194,9 @@ jobs:
       - restore_cache:
           keys:
           - v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
-      - run: sudo npm install -g npm
-      - run: npm install
+      - run: yarn install
       - save_cache:
           paths:
             - node_modules
           key: v1-dependencies-{{ checksum "package.json" }}-{{checksum "package-lock.json"}}
-      - run: npm run check-schemas
+      - run: yarn check-schemas

@@ -63,6 +63,57 @@ const isValidCredentialMeta = (credentialItem, constraints) => {
  */
 class ScopeRequest {
   /**
+   * Runs the credential 'isMatch' validation against each constraint individually and returns the failing constraints
+   * @param credentialItems - A list of credentialItems to check
+   * @param request - Original ScopeRequest
+   * @param checkCredentialMeta - If true, check credential meta
+   * @return {{ credentialId: string, identifier: string, constraint: object }[]} a list of failed claims
+   */
+  static async getFailingConstraints(credentialItems, request, checkCredentialMeta = false) {
+    const requestedItems = _.get(request, 'credentialItems');
+
+    if (_.isEmpty(requestedItems)) {
+      throw new Error('invalid scopeRequest object');
+    }
+    if (_.isEmpty(credentialItems)) {
+      throw new Error('empty credentialItems param');
+    }
+    // eslint-disable-next-line consistent-return
+    const result = (await Promise.all(_.map(requestedItems, async (requestedItem) => {
+      const credentialItem = _.find(credentialItems, cred => (cred.identifier === requestedItem.credential || cred.identifier === requestedItem.identifier));
+      if (!credentialItem) {
+        return null;
+      }
+
+      // If is a presentation `credentialItem.granted` nor empty accept partial
+      const verifiableCredential = await VC.fromJSON(credentialItem, !!credentialItem.granted);
+
+      const constraints = _.get(requestedItem, 'constraints');
+      const failedClaims = (constraints.claims || []).map((claimFilter) => {
+        const singleConstraint = _.get(_.set(_.cloneDeep(requestedItem), 'constraints.claims', [claimFilter]), 'constraints');
+        if (!verifiableCredential.isMatch(singleConstraint)) {
+          return { credentialId: credentialItem.id, identifier: credentialItem.identifier, constraint: claimFilter };
+        }
+        return null;
+      }).filter(item => !!item); // filter out nulls
+      if (checkCredentialMeta) {
+        Object.entries(constraints.meta || {}).forEach(([key, value]) => {
+          const singleMeta = _.get(_.set(_.cloneDeep(requestedItem), 'constraints.meta', { [key]: value }), 'constraints');
+          if (!isValidCredentialMeta(credentialItem, singleMeta)) {
+            failedClaims.push({
+              credentialId: credentialItem.id,
+              identifier: credentialItem.identifier,
+              constraint: _.assign({ path: `meta.${key}` }, value),
+            });
+          }
+        });
+      }
+      return failedClaims;
+    }))).filter(item => !!item); // filter out nulls
+    return _.flatten(result);
+  }
+
+  /**
    *
    * @param credentialItems - A list of credentialItems to check
    * @param request - Original ScopeRequest
@@ -82,7 +133,7 @@ class ScopeRequest {
     // eslint-disable-next-line consistent-return
     await _.reduce(requestedItems, async (promise, requestedItem) => {
       await promise;
-      const credentialItem = _.find(credentialItems, { identifier: requestedItem.credential });
+      const credentialItem = _.find(credentialItems, cred => (cred.identifier === requestedItem.credential || cred.identifier === requestedItem.identifier));
       if (!credentialItem) {
         // no need to continue breaking and returning false
         result = false;

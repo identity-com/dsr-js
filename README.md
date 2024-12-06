@@ -1,7 +1,7 @@
 # Dynamic Scope Request Javascript Library 
 
-[![CircleCI](https://circleci.com/gh/identity-com/dsr.svg?style=svg)](https://circleci.com/gh/identity-com/dsr)
-![npm (scoped)](https://img.shields.io/npm/v/@identity.com/dsr.svg)
+[![CircleCI](https://circleci.com/gh/civic-com/dsr.svg?style=svg)](https://circleci.com/gh/civic-com/dsr)
+![npm (scoped)](https://img.shields.io/npm/v/@civic.com/dsr.svg)
 
 ## Summary
 
@@ -11,24 +11,29 @@ DSR are part of the ecossystem of identity.com providing an standardized way for
 
 ## Contents
 
-- [Usage](#usage)
-  * [Config](#config)
-  * [Create ScopeRequest](#create-scoperequest)
-    + [ChannelsConfig](#channelsconfig)
-    + [AppConfig](#appconfig)
-  * [Build a signed ScopeRequest request body](#build-a-signed-scoperequest-request-body)
-  * [Build a signed ScopeRequest request body](#build-a-signed-scoperequest-request-body-1)
-- [Install](#install)
-  * [Prerequisites](#prerequisites)
-  * [Installation instructions](#installation-instructions)
-- [Test](#test)
-- [Publishing schemas](#publishing-schemas)
-- [Examples](#examples)
-  * [Simple Unresolved DSR Request with Global Identifiers](#simple-unresolved-dsr-request-with-global-identifiers)
-  * [Complex Unresolved DSR Request](#complex-unresolved-dsr-request)
-- [ES5 and ES6 definitions](#es5-and-es6-definitions)
-- [Node vs React usage of this library](#node-vs-react-usage-of-this-library)
-- [Releases](#releases)
+- [Dynamic Scope Request Javascript Library](#dynamic-scope-request-javascript-library)
+  - [Summary](#summary)
+  - [Contents](#contents)
+  - [Usage](#usage)
+    - [Config](#config)
+    - [Create ScopeRequest](#create-scoperequest)
+      - [ChannelsConfig](#channelsconfig)
+      - [AppConfig](#appconfig)
+    - [Build a signed ScopeRequest request body](#build-a-signed-scoperequest-request-body)
+    - [Build a signed ScopeRequest request body](#build-a-signed-scoperequest-request-body-1)
+  - [Utils](#utils)
+    - [Check if a scopeRequest RESPONSE fulfill the credentials constrains on the request](#check-if-a-scoperequest-response-fulfill-the-credentials-constrains-on-the-request)
+  - [Install](#install)
+    - [Prerequisites](#prerequisites)
+    - [Installation instructions](#installation-instructions)
+  - [Test](#test)
+  - [Publishing schemas](#publishing-schemas)
+  - [Examples](#examples)
+    - [Simple Unresolved DSR Request with Global Identifiers](#simple-unresolved-dsr-request-with-global-identifiers)
+    - [Complex Unresolved DSR Request](#complex-unresolved-dsr-request)
+  - [ES5 and ES6 definitions](#es5-and-es6-definitions)
+  - [Node vs React usage of this library](#node-vs-react-usage-of-this-library)
+  - [Releases](#releases)
 
 ## Usage
 
